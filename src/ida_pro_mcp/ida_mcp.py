@@ -68,19 +68,21 @@ class MCP(idaapi.plugin_t):
         return idaapi.PLUGIN_KEEP
 
     def run(self, arg):
-        # Show configuration dialog
-        form = MCPConfigForm(self.host, self.port)
-        form.Compile()
-        ok = form.Execute()
-        if ok != 1:
-            print("[MCP] Server start cancelled by user")
-            form.Free()
-            return
+        # Skip dialog in batch/terminal mode, use defaults
+        if not idaapi.cvar.batch:
+            # Show configuration dialog
+            form = MCPConfigForm(self.host, self.port)
+            form.Compile()
+            ok = form.Execute()
+            if ok != 1:
+                print("[MCP] Server start cancelled by user")
+                form.Free()
+                return
 
-        # Get values from form
-        self.host = form.host.value
-        self.port = form.port.value
-        form.Free()
+            # Get values from form
+            self.host = form.host.value
+            self.port = form.port.value
+            form.Free()
 
         if self.mcp:
             self.mcp.stop()
