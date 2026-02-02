@@ -23,6 +23,26 @@ def unload_package(package_name: str):
         del sys.modules[mod_name]
 
 
+class MCPConfigForm(idaapi.Form):
+    """Form to configure MCP server host and port."""
+
+    def __init__(self, host: str, port: int):
+        form_str = r"""STARTITEM 0
+MCP Server Configuration
+
+<Host:{host}>
+<Port:{port}>
+"""
+        idaapi.Form.__init__(
+            self,
+            form_str,
+            {
+                "host": idaapi.Form.StringInput(value=host),
+                "port": idaapi.Form.NumericInput(value=port, tp=idaapi.Form.FT_DEC),
+            },
+        )
+
+
 class MCP(idaapi.plugin_t):
     flags = idaapi.PLUGIN_KEEP
     comment = "MCP Plugin"
@@ -30,9 +50,9 @@ class MCP(idaapi.plugin_t):
     wanted_name = "MCP"
     wanted_hotkey = "Ctrl-Alt-M"
 
-    # TODO: make these configurable
-    HOST = "127.0.0.1"
-    PORT = 13337
+    # Default values (can be changed via dialog)
+    DEFAULT_HOST = "127.0.0.1"
+    DEFAULT_PORT = 13337
 
     def init(self):
         hotkey = MCP.wanted_hotkey.replace("-", "+")
@@ -43,9 +63,25 @@ class MCP(idaapi.plugin_t):
             f"[MCP] Plugin loaded, use Edit -> Plugins -> MCP ({hotkey}) to start the server"
         )
         self.mcp: "ida_mcp.rpc.McpServer | None" = None
+        self.host = MCP.DEFAULT_HOST
+        self.port = MCP.DEFAULT_PORT
         return idaapi.PLUGIN_KEEP
 
     def run(self, arg):
+        # Show configuration dialog
+        form = MCPConfigForm(self.host, self.port)
+        form.Compile()
+        ok = form.Execute()
+        if ok != 1:
+            print("[MCP] Server start cancelled by user")
+            form.Free()
+            return
+
+        # Get values from form
+        self.host = form.host.value
+        self.port = form.port.value
+        form.Free()
+
         if self.mcp:
             self.mcp.stop()
             self.mcp = None
@@ -64,13 +100,13 @@ class MCP(idaapi.plugin_t):
 
         try:
             MCP_SERVER.serve(
-                self.HOST, self.PORT, request_handler=IdaMcpHttpRequestHandler
+                self.host, self.port, request_handler=IdaMcpHttpRequestHandler
             )
-            print(f"  Config: http://{self.HOST}:{self.PORT}/config.html")
+            print(f"  Config: http://{self.host}:{self.port}/config.html")
             self.mcp = MCP_SERVER
         except OSError as e:
             if e.errno in (48, 98, 10048):  # Address already in use
-                print(f"[MCP] Error: Port {self.PORT} is already in use")
+                print(f"[MCP] Error: Port {self.port} is already in use")
             else:
                 raise
 
