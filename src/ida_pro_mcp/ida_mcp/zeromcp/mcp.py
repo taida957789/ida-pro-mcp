@@ -312,9 +312,10 @@ class McpServer:
             print("[MCP] Server is already running")
             return
 
-        # Create server with deferred binding
+        # Always use ThreadingHTTPServer so one stuck request does not block others.
+        # background only controls whether serve_forever() runs in main thread (False) or a daemon thread (True).
         assert issubclass(request_handler, McpHttpRequestHandler)
-        self._http_server = (ThreadingHTTPServer if background else HTTPServer)(
+        self._http_server = ThreadingHTTPServer(
             (host, port),
             request_handler,
             bind_and_activate=False
