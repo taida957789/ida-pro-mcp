@@ -345,9 +345,9 @@ def main():
     signal.signal(signal.SIGTERM, cleanup_and_exit)
 
     # NOTE: npx -y @modelcontextprotocol/inspector for debugging
-    # TODO: with background=True the main thread (this one) does not fake any
-    # work from @idasync, so we deadlock.
-    MCP_SERVER.serve(host=args.host, port=args.port, background=False)
+    # background=False: main thread runs serve_forever() so it can process idaapi.execute_sync (@idasync).
+    # threaded=False: handlers run on main thread — tools/call would deadlock otherwise (worker waits for main to run sync).
+    MCP_SERVER.serve(host=args.host, port=args.port, background=False, threaded=False)
 
 
 if __name__ == "__main__":

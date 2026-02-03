@@ -307,15 +307,16 @@ class McpServer:
     def prompt(self, func: Callable) -> Callable:
         return self.prompts.method(func)
 
-    def serve(self, host: str, port: int, *, background = True, request_handler = McpHttpRequestHandler):
+    def serve(self, host: str, port: int, *, background = True, threaded = True, request_handler = McpHttpRequestHandler):
         if self._running:
             print("[MCP] Server is already running")
             return
 
-        # Always use ThreadingHTTPServer so one stuck request does not block others.
-        # background only controls whether serve_forever() runs in main thread (False) or a daemon thread (True).
+        # threaded=True (default): ThreadingHTTPServer — one thread per request, multiple connections.
+        # threaded=False: HTTPServer — handlers run on the thread that called serve_forever() (required for
+        #   idaapi.execute_sync / @idasync: that thread must run the request so it can process the sync queue).
         assert issubclass(request_handler, McpHttpRequestHandler)
-        self._http_server = ThreadingHTTPServer(
+        self._http_server = (ThreadingHTTPServer if threaded else HTTPServer)(
             (host, port),
             request_handler,
             bind_and_activate=False
